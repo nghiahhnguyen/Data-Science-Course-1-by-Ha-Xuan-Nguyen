@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Sep  6 10:21:46 2018
+
+@author: nghia-nguyen
+"""
+
+#importing libraries
+import folium
+import pandas as pd
+import numpy as np
+import time
+import geocoder
+
+# San Francisco latitude and longitude values
+lat = 37.77
+long = -122.42
+
+sanfran_map=folium.Map(location=[lat, long], zoom_start=12)
+sanfran_map
+
+# read in the data
+df_streets=pd.read_csv("Potentail_Bust_Stops.csv")
+
+#show the data
+df_streets.head()
+
+# rename columns
+df_streets.rename(columns={"Street_One": "Str1", "Street_Two":"Str2"}, inplace=True)
+df_streets.head()
+
+# Coordinates of the intersection with index 0
+inter=df_streets.iloc[0]
+intersection=inter[0]+' & '+inter[1] + ", San Francisco, US"
+result = geocoder.arcgis(intersection)
+print("Address: ", result.address)
+print("Latitude: ", result.lat)
+print("Longitude: ", result.lng)
+
+# Getting the coordinates of all the places
+# This will take a lot of time because of the sleep() function. 
+# I had to use this to match the rate limit of arcis
+lats, longs=[], []
+for str1, str2 in zip(df_streets.Str1, df_streets.Str2):
+    intersection=str1 + ' & ' + str2 + ", San Francisco, US"
+    time.sleep(10)
+    result=geocoder.arcgis(intersection)
+    lats.append(result.lat)
+    longs.append(result.lng)
+    
+# add the latitudes and longitudes
+streets=df_streets.copy()
+streets['lat']=lats
+streets['long']=longs
+
+# initialize a Feature Group for the intersections
+intersections=folium.map.FeatureGroup()
+
+# loop through all the intersections and add them to the Feature Group
+for lat, lng in zip(streets.lat, streets.long):
+    intersections.add_child(
+    folium.features.CircleMarker(
+    [lat, lng],
+    radius=5, # define how big you want the circle markers to be
+    color='yellow',
+    fill=True,
+    fill_color='blue',
+    fill_opacity=0.6))
+
+# add intersections to the map
+sanfran_map.add_child(intersections)
+
+# saving the map to an HTML link
+sanfran_map.save("sanfran_map_with_intersections.html")
